@@ -1,9 +1,16 @@
-import curses
-import time
-from arp_spoof import arp_spoof_attack, restore_arp
-from network_scanner import scan_network
-from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, clear_iptables
+while True:
+    try:
+        import curses
+        import time
+        from arp_spoof import arp_spoof_attack, restore_arp
+        from network_scanner import scan_network
+        from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, clear_iptables
+        break
+    except:
+        from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, \
+            setup_iptables, clear_iptables
 
+        install_dependencies()
 # ASCII-логотип "Sniff-NG"
 logo_art = [
     "",
@@ -135,7 +142,7 @@ def arp_spoofing_ui(stdscr):
     stdscr.addstr(2, 2, "=== Запуск ARP Spoofing ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     stdscr.addstr(4, 4, "Выполняется ARP Spoofing атака...", curses.color_pair(3))  # Сообщение о выполнении ARP Spoofing
     stdscr.refresh()  # Обновляем экран
-    arp_spoof_attack()  # Выполняем функцию ARP Spoofing
+    arp_spoof_attack(stdscr.getstr(0,0, 15),stdscr.getstr(0,0, 15))  # Выполняем функцию ARP Spoofing
     stdscr.addstr(6, 2, "ARP Spoofing запущен. Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение о завершении
     stdscr.refresh()  # Обновляем экран
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата
@@ -149,7 +156,7 @@ def restore_arp_ui(stdscr):
     stdscr.addstr(2, 2, "=== Восстановление таблиц ARP ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     stdscr.addstr(4, 4, "Восстанавливаем таблицы ARP...", curses.color_pair(3))  # Сообщение о процессе восстановления
     stdscr.refresh()  # Обновляем экран
-    restore_arp()  # Выполняем функцию восстановления ARP
+    restore_arp(stdscr.getmaxyx,stdscr.getmaxyx)  # Выполняем функцию восстановления ARP
     stdscr.addstr(6, 2, "Таблицы ARP восстановлены. Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение о завершении
     stdscr.refresh()  # Обновляем экран
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата
