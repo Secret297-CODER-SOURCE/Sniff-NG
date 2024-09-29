@@ -21,7 +21,7 @@ def install_package(package_name):
     elif distro in ['fedora', 'centos']:
         subprocess.run(["sudo", "dnf", "install", "-y", package_name], check=True)
     elif distro in ['arch', 'manjaro']:
-        subprocess.run(["sudo", "pacman", "-S", "--noconfirm", package_name], check=True)
+        subprocess.run(["sudo", "pacman", "-Sy", "--noconfirm", package_name], check=True)
     else:
         print(f"[!] Unsupported distribution: {distro}. Please install {package_name} manually.")
 
@@ -44,13 +44,19 @@ def install_dependencies():
         import scapy
     except ImportError:
         print("[*] Installing scapy...")
-        subprocess.run(["pip", "install", "scapy"], check=True)
+        try:
+            subprocess.run(["sudo","pip", "install", "scapy"], check=True)
+        except:
+            try:
+                subprocess.run(["sudo", "apt", "install", "scapy"], check=True)
+            except:
+                subprocess.run(["sudo", "apt", "install", "python3-scapy"], check=True)
 
     try:
         import mitmproxy
     except ImportError:
         print("[*] Installing mitmproxy...")
-        subprocess.run(["pip", "install", "mitmproxy"], check=True)
+        subprocess.run(["sudo","pip", "install", "mitmproxy"], check=True)
 
     print("[*] All necessary packages installed.")
 
@@ -63,6 +69,11 @@ def disable_ip_forwarding():
 def setup_iptables():
     os.system("iptables -t nat -A PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080")
     os.system("iptables -t nat -A PREROUTING -p tcp --dport 443 -j REDIRECT --to-port 8080")
+
+def forward_config():
+    os.system("sysctl -w net.ipv4.ip_forward=1")
+    os.system("sysctl -w net.ipv4.ip_forward=1 ")
+
 
 def clear_iptables():
     os.system("iptables -t nat -D PREROUTING -p tcp --dport 80 -j REDIRECT --to-port 8080")

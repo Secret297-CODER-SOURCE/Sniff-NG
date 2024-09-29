@@ -2,7 +2,7 @@ import argparse
 from arp_spoof import arp_spoof_attack, restore_arp
 from network_scanner import scan_network
 from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, \
-    clear_iptables
+    clear_iptables,forward_config
 
 
 def main():
@@ -15,7 +15,7 @@ def main():
     parser.add_argument("-r", "--restore", action="store_true", help="Restore ARP tables")
 
     args = parser.parse_args()
-
+    forward_config()
     if args.install:
         install_dependencies()
 
