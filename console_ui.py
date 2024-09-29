@@ -104,7 +104,8 @@ def scan_network_ui(stdscr):
     # Рисуем логотип
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
         stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
-    current_line = 10  # Начинаем с 2 строки
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
+    current_line = 14  # Начинаем с 2 строки
     stdscr.addstr(current_line, 2, "=== Сканирование сети ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     current_line += 2  # Переходим на следующую строку
     stdscr.addstr(current_line, 4, "Сканирование сети, пожалуйста, подождите...", curses.color_pair(3))  # Сообщение о процессе сканирования
@@ -130,6 +131,7 @@ def arp_spoofing_ui(stdscr):
     # Рисуем логотип
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
         stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
     stdscr.addstr(2, 2, "=== Запуск ARP Spoofing ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     stdscr.addstr(4, 4, "Выполняется ARP Spoofing атака...", curses.color_pair(3))  # Сообщение о выполнении ARP Spoofing
     stdscr.refresh()  # Обновляем экран
@@ -143,6 +145,7 @@ def restore_arp_ui(stdscr):
     # Рисуем логотип
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
         stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
     stdscr.addstr(2, 2, "=== Восстановление таблиц ARP ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     stdscr.addstr(4, 4, "Восстанавливаем таблицы ARP...", curses.color_pair(3))  # Сообщение о процессе восстановления
     stdscr.refresh()  # Обновляем экран
@@ -156,6 +159,7 @@ def install_dependencies_ui(stdscr):
     # Рисуем логотип
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
         stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
     stdscr.addstr(2, 2, "=== Установка зависимостей ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     stdscr.addstr(4, 4, "Устанавливаем зависимости...", curses.color_pair(3))  # Сообщение о процессе установки
     stdscr.refresh()  # Обновляем экран
