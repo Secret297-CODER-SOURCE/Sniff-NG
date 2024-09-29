@@ -43,10 +43,11 @@ def draw_logo_and_menu(stdscr, current_row, menu):
     # Рисуем меню
     draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
     stdscr.addstr(len(logo_art) + 2, 2, "=== Sniff-NG Меню ===", curses.A_BOLD | curses.color_pair(2))  # Добавляем заголовок меню
-    stdscr.addstr(len(logo_art) + 4, 2, "Используйте стрелки для навигации и Enter для выбора.\n", curses.A_BOLD | curses.color_pair(3))  # Добавляем инструкции
+    stdscr.addstr(len(logo_art) + 4, 4, "❤️WER1XY❤️", curses.A_BOLD | curses.color_pair(1))  # Добавляем инструкции
+    stdscr.addstr(len(logo_art) + 6, 2, "Используйте стрелки для навигации и Enter для выбора.\n", curses.A_BOLD | curses.color_pair(3))  # Добавляем инструкции
 
     for idx, row in enumerate(menu):  # Проходим по элементам меню
-        y_position = len(logo_art) + 6 + idx  # Рассчитываем вертикальную позицию для каждого элемента
+        y_position = len(logo_art) + 8 + idx  # Рассчитываем вертикальную позицию для каждого элемента
         if idx == current_row:  # Подсвечиваем текущий элемент меню
             stdscr.attron(curses.color_pair(4))  # Устанавливаем цвет подсветки
             stdscr.addstr(y_position, 2, f"> {row}")  # Добавляем подсвеченный элемент меню
@@ -142,7 +143,9 @@ def arp_spoofing_ui(stdscr):
     stdscr.addstr(2, 2, "=== Запуск ARP Spoofing ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     stdscr.addstr(4, 4, "Выполняется ARP Spoofing атака...", curses.color_pair(3))  # Сообщение о выполнении ARP Spoofing
     stdscr.refresh()  # Обновляем экран
-    arp_spoof_attack(stdscr.getstr(0,0, 15),stdscr.getstr(0,0, 15))  # Выполняем функцию ARP Spoofing
+    target=stdscr.getstr(0, 0, 15)
+    getway=stdscr.getstr(0,0, 15)
+    arp_spoof_attack(target,getway)  # Выполняем функцию ARP Spoofing
     stdscr.addstr(6, 2, "ARP Spoofing запущен. Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение о завершении
     stdscr.refresh()  # Обновляем экран
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата

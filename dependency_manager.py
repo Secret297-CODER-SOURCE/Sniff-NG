@@ -45,7 +45,10 @@ def install_dependencies():
     except ImportError:
         print("[*] Installing scapy...")
         try:
-            subprocess.run(["sudo","pip", "install", "scapy"], check=True)
+            try:
+                install_package("scapy")
+            except:
+                subprocess.run(["sudo","pip", "install", "scapy"], check=True)
         except:
             try:
                 subprocess.run(["sudo", "apt", "install", "scapy"], check=True)
