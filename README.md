@@ -1,4 +1,4 @@
-# Network Attack Tool — Инструкция по использованию
+# Sniff-NG — Инструкция по использованию
 
 ## Описание
 
@@ -30,7 +30,7 @@ python3 main.py --install
 Для Ubuntu/Debian
 ```bash
 sudo apt-get install arp-scan dsniff
-pip install scapy mitmproxy
+pip install python-scapy mitmproxy
 ```
 Для Arch Linux
 ```bash
