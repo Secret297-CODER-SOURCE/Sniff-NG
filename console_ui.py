@@ -1,6 +1,7 @@
 while True:
     try:
         import curses
+        import curses.textpad
         import time
         from arp_spoof import arp_spoof_attack, restore_arp
         from network_scanner import scan_network
@@ -132,6 +133,8 @@ def scan_network_ui(stdscr):
             current_line += 1  # Переходим на следующую строку для следующего устройства
     stdscr.addstr(current_line + 2, 2, "Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение для возврата в меню
     stdscr.refresh()  # Обновляем экран
+    draw_status_bar(stdscr,
+                    "Статус: Сканирование | Нажмите Enter для выхода.")  # Показываем строку состояния
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата
 
 def arp_spoofing_ui(stdscr):
@@ -140,16 +143,52 @@ def arp_spoofing_ui(stdscr):
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
         stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
     draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
-    stdscr.addstr(2, 2, "=== Запуск ARP Spoofing ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
-    stdscr.addstr(4, 4, "Выполняется ARP Spoofing атака...", curses.color_pair(3))  # Сообщение о выполнении ARP Spoofing
+    stdscr.addstr(12, 2, "=== Запуск ARP Spoofing ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
+
+    # Ввод Target IP
+    stdscr.addstr(16, 2, "Введите Target IP: ", curses.color_pair(2))  # Вопрос для ввода Target IP
+    target_window = stdscr.subwin(1, 24, 16, 24)  # Создаем окно для ввода IP
+    curses.textpad.rectangle(stdscr, 15, 22, 17, 48)  # Рисуем рамку для поля ввода
+    target_box = curses.textpad.Textbox(target_window)  # Поле для ввода Target IP
+    draw_status_bar(stdscr,
+                    "Статус: ARP-Spoofing | Введите Target | Нажмите Enter для подтверждения.")
+    # Ввод Gateway IP
+    stdscr.addstr(20, 2, "Введите Gateway IP: ", curses.color_pair(2))  # Вопрос для ввода Gateway IP
+    gateway_window = stdscr.subwin(1, 24, 20, 24)  # Создаем окно для ввода IP
+    curses.textpad.rectangle(stdscr, 19, 22, 21, 48)  # Рисуем рамку для поля ввода
+    gateway_box = curses.textpad.Textbox(gateway_window)  # Поле для ввода Gateway IP
+    draw_status_bar(stdscr,
+                    "Статус: ARP-Spoofing | Введите Gateway | Нажмите Enter для подтверждения.")
+    stdscr.addstr(26, 2, "Нажмите CTRL+X для завершения ввода.", curses.color_pair(2))  # Сообщение о завершении ввода
     stdscr.refresh()  # Обновляем экран
-    target=stdscr.getstr(0, 0, 15)
-    getway=stdscr.getstr(0,0, 15)
-    arp_spoof_attack(target,getway)  # Выполняем функцию ARP Spoofing
-    stdscr.addstr(6, 2, "ARP Spoofing запущен. Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение о завершении
+
+    def custom_edit_textbox(textbox):
+        """Функция для расширенного редактирования текста с заменой символа при удалении на пробел."""
+        while True:
+            char = textbox.win.getch()  # Чтение символа с клавиатуры
+            if char == curses.KEY_BACKSPACE or char == 127:  # Обработка клавиши Backspace
+                y, x = textbox.win.getyx()  # Получаем текущие координаты курсора
+                if x > 0:  # Если не в начале строки
+                    textbox.win.delch(y, x - 1)  # Удаляем символ слева от курсора
+                    textbox.win.insch(y, x - 1, ' ')  # Вставляем пробел вместо удаленного символа
+                    textbox.win.move(y, x - 1)  # Перемещаем курсор на позицию назад
+            elif char == 10:  # Если нажата клавиша Enter, завершаем ввод
+                break
+            else:
+                textbox.do_command(char)  # Все остальные символы передаем в стандартную обработку
+        return textbox.gather()  # Возвращаем введенный текст
+
+    # Получаем и обрабатываем введенные значения
+    target_ip = custom_edit_textbox(target_box).strip()  # Получаем введенный Target IP
+    gateway_ip = custom_edit_textbox(gateway_box).strip()  # Получаем введенный Gateway IP
+
+    # Запускаем ARP Spoofing с введенными данными
+    arp_spoof_attack(target_ip, gateway_ip)  # Выполняем функцию ARP Spoofing
+
+    stdscr.addstr(22, 2, "ARP Spoofing запущен. Нажмите любую клавишу, чтобы вернуться в меню...",
+                  curses.color_pair(3))  # Сообщение о завершении
     stdscr.refresh()  # Обновляем экран
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата
-
 def restore_arp_ui(stdscr):
     stdscr.clear()  # Очищаем экран
     # Рисуем логотип
