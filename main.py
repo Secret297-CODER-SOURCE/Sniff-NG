@@ -13,7 +13,7 @@ def main():
     parser.add_argument("-i", "--install", action="store_true", help="Install necessary dependencies")
     parser.add_argument("-a", "--attack", action="store_true", help="Start ARP spoofing attack")
     parser.add_argument("-r", "--restore", action="store_true", help="Restore ARP tables")
-
+    print("test")
     args = parser.parse_args()
     forward_config()
     if args.install:
