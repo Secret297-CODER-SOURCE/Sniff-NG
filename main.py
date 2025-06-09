@@ -1,8 +1,19 @@
-import argparse
-from arp_spoof import arp_spoof_attack, restore_arp
-from network_scanner import scan_network
-from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, \
-    clear_iptables,forward_config
+try:
+    import argparse
+    from arp_spoof import arp_spoof_attack, restore_arp
+    from network_scanner import scan_network
+    from dependency_manager import (
+        install_dependencies,
+        enable_ip_forwarding,
+        disable_ip_forwarding,
+        setup_iptables,
+        clear_iptables,
+        forward_config
+    )
+    print("[+] Dependencies imported successfully")
+except ImportError as e:
+    print(f"[!] Import failed: {e}")
+    forward_config = None
 
 
 def main():
@@ -13,11 +24,21 @@ def main():
     parser.add_argument("-i", "--install", action="store_true", help="Install necessary dependencies")
     parser.add_argument("-a", "--attack", action="store_true", help="Start ARP spoofing attack")
     parser.add_argument("-r", "--restore", action="store_true", help="Restore ARP tables")
-    print("test")
     args = parser.parse_args()
-    forward_config()
+
     if args.install:
-        install_dependencies()
+        try:
+            from dependency_manager import install_dependencies
+            install_dependencies()
+            print("[+] Dependencies installed successfully")
+        except Exception as e:
+            print(f"[!] Failed to install dependencies: {e}")
+        return
+
+    if forward_config:
+        forward_config()
+    else:
+        print("[!] forward_config is not available due to failed imports.")
 
     if args.scan:
         scan_network()

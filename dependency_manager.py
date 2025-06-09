@@ -26,6 +26,13 @@ def install_package(package_name):
         print(f"[!] Unsupported distribution: {distro}. Please install {package_name} manually.")
 
 def install_dependencies():
+    pip_flag = input("[?] Do you want to enable '--break-system-packages' flag [y/n]: ")
+
+    if pip_flag in ["y", "n"]:
+        pip_flag = pip_flag == "y"
+    else:
+        print("[!] Please enter 'y' or 'n'")
+
     print("[*] Installing necessary packages...")
 
     if not is_installed("arp-scan"):
@@ -47,14 +54,20 @@ def install_dependencies():
         try:
             install_package("scapy")
         except:
-            subprocess.run(["sudo","pip", "install", "scapy"], check=True)
+            if pip_flag == False:
+                subprocess.run(["sudo","pip", "install", "scapy"], check=True)
+            else:
+                subprocess.run(["sudo","pip", "install", "scapy", "--break-system-packages"], check=True)
 
 
     try:
         import mitmproxy
     except ImportError:
         print("[*] Installing mitmproxy...")
-        subprocess.run(["sudo","pip", "install", "mitmproxy"], check=True)
+        if pip_flag == False:
+            subprocess.run(["sudo","pip", "install", "mitmproxy"], check=True)
+        else:
+            subprocess.run(["sudo","pip", "install", "mitmproxy", "--break-system-packages"], check=True)
 
     print("[*] All necessary packages installed.")
 
