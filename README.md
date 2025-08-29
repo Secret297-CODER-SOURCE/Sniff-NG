@@ -69,11 +69,6 @@ All features are available via the TUI menu:
 - Enter: select  
 - Hints at the bottom
 
----
-
-## Example
-
-_Add a screenshot or TUI demo here if available!_
 
 ---
 
