@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
 ![Platform: Linux](https://img.shields.io/badge/platform-Linux-yellow)
 ![Status: Active](https://img.shields.io/badge/status-active-brightgreen)
-![img_1.png](img_1.png)
+![img.png](img.png)
 ---
 
 **Tags:**  
