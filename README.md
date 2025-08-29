@@ -1,117 +1,91 @@
-# Sniff-NG — Инструкция по использованию
+# Sniff-NG
 
-## Описание
+> **Powerful Python tool for network scanning, ARP spoofing, and local network MITM attacks with TUI interface.**
 
-Данная утилита предназначена для сканирования сети, выполнения ARP-спуфинга и управления сетевыми настройками. Она поддерживает автоматическую установку зависимостей и может работать на различных дистрибутивах Linux (Debian, Ubuntu, Arch, Fedora, CentOS и т.д.).
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
+![Platform: Linux](https://img.shields.io/badge/platform-Linux-yellow)
+![Status: Active](https://img.shields.io/badge/status-active-brightgreen)
+![img_1.png](img_1.png)
+---
 
-## Требования
+**Tags:**  
+`network` `arp-spoofing` `mitm` `sniffer` `ethical-hacking` `pentest` `python` `security` `tui` `linux` `local-network` `network-scanner` `infosec` `hacking-tool`
 
-- Python 3.x
-- Пакетный менеджер `apt`, `dnf` или `pacman` в зависимости от вашего дистрибутива Linux
-- Python-библиотеки: `scapy`, `mitmproxy`
+---
 
-## Установка
+## About
 
-### 1. Клонирование репозитория
+**Sniff-NG** is a Python tool for network security testing.  
+It provides fast local network device scanning, ARP spoofing (MITM), and a fully interactive TUI menu.  
+Supports multiple Linux distributions and automatic dependency installation.
 
-Сначала клонируйте репозиторий или скопируйте файлы утилиты на ваш компьютер:
+---
+
+## Features
+
+- **TUI interface:** no command line needed
+- **Network scanner:** find all devices in the local network
+- **ARP spoofing / MITM:** easy attack launch via menu
+- **Restore ARP tables:** clean up after attacks
+- **One-click dependency install:** works on Ubuntu, Debian, Arch, Fedora, CentOS, etc.
+- **Python 3.8+** compatible
+
+---
+
+## Requirements
+
+- Linux OS (Debian, Ubuntu, Arch, Fedora, CentOS, etc.)
+- Python 3.8+
+- Tools: `arp-scan`, `dsniff`
+- Python libraries: `scapy`, `mitmproxy`
+
+---
+
+## Installation
 
 ```bash
 git clone https://github.com/Secret297-CODER-SOURCE/Sniff-NG.git
-cd network_tool
+cd Sniff-NG
+sudo python3 console_ui.py
 ```
-### 2. Установка необходимых зависимостей
-Вы можете автоматически установить все необходимые зависимости с помощью утилиты:
+> **Run with `sudo`!**  
+> Most features require root privileges for network access.
 
-```bash
-python3 main.py --install
-```
-### 3. Ручная установка зависимостей (если автоматическая установка не удалась)
-Для Ubuntu/Debian
-```bash
-sudo apt-get install arp-scan dsniff
-pip install python-scapy mitmproxy
-```
-Для Arch Linux
-```bash
-sudo pacman -S arp-scan dsniff
-pip install scapy mitmproxy
-```
-Для Fedora/CentOS
-```bash
-sudo dnf install arp-scan dsniff
-pip install scapy mitmproxy
-```
-## Использование
-### 1. Сканирование сети
-Чтобы сканировать сеть и получить список подключённых устройств:
+If dependencies are missing, select "Install dependencies" in the TUI menu.
 
-```bash
-python3 main.py --scan
-```
-Результаты сканирования будут включать IP- и MAC-адреса обнаруженных устройств в сети.
+---
 
-### ARP-спуфинг
-Для выполнения атаки ARP-спуфинга вам нужно указать IP-адрес жертвы и шлюза (роутера). Для этого используйте следующую команду:
+## Usage
 
-```bash
-python3 main.py --attack --target <target_ip> --gateway <gateway_ip>
-```
-#### Где:
+All features are available via the TUI menu:
+- **Network Scan:** shows all connected devices
+- **ARP Spoofing:** attack any target/gateway on your LAN
+- **Restore ARP:** cleans up ARP tables
+- **Install dependencies:** one-click setup
 
-<target_ip> — IP-адрес устройства, которое будет атаковано.
-<gateway_ip> — IP-адрес вашего роутера.
-Пример:
+**Controls:**  
+- Up/Down: navigate  
+- Enter: select  
+- Hints at the bottom
 
-```bash
-python3 main.py --attack --target 192.168.1.5 --gateway 192.168.1.1
-```
-### 3. Восстановление ARP-таблиц
-После завершения атаки необходимо восстановить ARP-таблицы жертвы и роутера:
+---
 
-```bash
-python3 main.py --restore --target <target_ip> --gateway <gateway_ip>
-```
-Пример:
+## Example
 
-```bash
-python3 main.py --restore --target 192.168.1.5 --gateway 192.168.1.1
-```
-### 4. Остановка атаки
-Для завершения атаки ARP-спуфинга просто нажмите Ctrl+C, чтобы остановить процесс. Утилита автоматически выполнит восстановление ARP-таблиц и отключит переадресацию IP.
+_Add a screenshot or TUI demo here if available!_
 
-##  Функции
-Установка зависимостей
-Запуск этой команды автоматически проверит и установит все необходимые утилиты и библиотеки:
+---
 
-```bash
-python3 main.py --install
-````
-## Сканирование сети
-Команда для сканирования сети:
+## Security Notice
 
-```bash
-python3 main.py --scan
-````
-## ARP-спуфинг
-Команда для начала ARP-спуфинга:
+- For **educational and authorized penetration testing only**!
+- Do not use against networks you do not own or have explicit permission to test.
 
-```bash
-python3 main.py --attack --target <target_ip> --gateway <gateway_ip>
-```
-## Восстановление ARP-таблиц
-Команда для восстановления ARP-таблиц:
+---
 
-```bash
-python3 main.py --restore --target <target_ip> --gateway <gateway_ip>
-```
-## Включение IP Forwarding
-Утилита автоматически включает IP Forwarding при выполнении атаки ARP-спуфинга. Это позволяет пакеты от жертвы пересылать через атакующего.
+## Contributing
 
-## Возможные проблемы
-Отсутствие прав суперпользователя: Убедитесь, что вы запускаете скрипт с правами суперпользователя (sudo), так как для сканирования сети и изменения настроек системы требуются права администратора.
+Pull requests are welcome!  
+Please open issues for bugs, ideas, or feature requests.
 
-Отсутствие пакетов: Если автоматическая установка зависимостей не сработала, попробуйте установить пакеты вручную.
-
-## Заключение
-Утилита позволяет легко управлять сетевыми атаками, такими как ARP-спуфинг, и восстанавливать сетевые настройки после завершения атаки. Она также поддерживает автоматическую установку всех зависимостей для различных дистрибутивов Linux.
