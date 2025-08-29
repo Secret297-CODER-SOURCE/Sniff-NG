@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sniff-ng"
+version = "0.1.0"
+description = "Powerful Python tool for network scanning, ARP spoofing, and local network MITM attacks with TUI interface."
+readme = "README.md"
+requires-python = ">=3.8"
+authors = [{name="Secret297-CODER-SOURCE"}]
+license = {text = "MIT"}
+keywords = ["network", "arp-spoofing", "mitm", "sniffer", "pentest", "tui", "python", "security", "linux"]
+dependencies = [
+    "scapy",
+    "mitmproxy"
+]
+
+[project.urls]
+Homepage = "https://github.com/Secret297-CODER-SOURCE/Sniff-NG"
