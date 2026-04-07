@@ -1,10 +1,95 @@
+def get_gateway_for_target(target_ip):
+    """Возвращает gateway (роутер) для подсети, в которой находится target_ip."""
+    try:
+        gws = netifaces.gateways()
+        default_gws = gws.get('default', {})
+        # Обычно default_gws[netifaces.AF_INET] = (gateway_ip, iface)
+        if netifaces.AF_INET in default_gws:
+            return default_gws[netifaces.AF_INET][0]
+        # Если несколько, ищем по интерфейсу
+        for af, gw_list in gws.items():
+            if af == netifaces.AF_INET:
+                for gw in gw_list:
+                    gw_ip, iface, *_ = gw
+                    addrs = netifaces.ifaddresses(iface)
+                    if netifaces.AF_INET in addrs:
+                        for addr in addrs[netifaces.AF_INET]:
+                            ip = addr.get('addr')
+                            if ip:
+                                net = ipaddress.ip_network(ip + '/24', strict=False)
+                                if ipaddress.ip_address(target_ip) in net:
+                                    return gw_ip
+    except Exception:
+        pass
+    return None
+import netifaces
+import ipaddress
+import socket
+def select_devices_ui(stdscr, devices):
+    """Интерактивный выбор одного или нескольких устройств из списка."""
+    if not devices:
+        safe_addstr(stdscr, 2, 2, "Нет доступных устройств для выбора.", curses.color_pair(3))
+        stdscr.refresh()
+        stdscr.getch()
+        return []
+
+    selection_cursor = 0
+    selected_indexes = set()
+
+    while True:
+        stdscr.clear()
+        for i, line in enumerate(logo_art):
+            safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+
+        safe_addstr(stdscr, 12, 2, "=== Выбор устройств для аудита ===", curses.A_BOLD | curses.color_pair(2))
+        safe_addstr(stdscr, 13, 2, "Space: выбрать, Enter: подтвердить, Q: назад", curses.color_pair(3))
+
+        max_rows = max(5, stdscr.getmaxyx()[0] - 18)
+        window_start = max(0, selection_cursor - max_rows + 1)
+        window_end = min(len(devices), window_start + max_rows)
+
+        row_y = 15
+        for idx in range(window_start, window_end):
+            device = devices[idx]
+            ip = device.get("ip", "?") if isinstance(device, dict) else str(device)
+            mac = device.get("mac", "?") if isinstance(device, dict) else "?"
+            mark = "[x]" if idx in selected_indexes else "[ ]"
+            row_text = f"{mark} {ip}  {mac}"
+
+            if idx == selection_cursor:
+                stdscr.attron(curses.color_pair(4))
+                safe_addstr(stdscr, row_y, 2, row_text)
+                stdscr.attroff(curses.color_pair(4))
+            else:
+                safe_addstr(stdscr, row_y, 2, row_text, curses.color_pair(5))
+            row_y += 1
+
+        draw_status_bar(stdscr, f"Выбрано устройств: {len(selected_indexes)}")
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == curses.KEY_UP and selection_cursor > 0:
+            selection_cursor -= 1
+        elif key == curses.KEY_DOWN and selection_cursor < len(devices) - 1:
+            selection_cursor += 1
+        elif key == ord(' '):
+            if selection_cursor in selected_indexes:
+                selected_indexes.remove(selection_cursor)
+            else:
+                selected_indexes.add(selection_cursor)
+        elif key in [10, 13]:
+            break
+        elif key in [ord('q'), ord('Q')]:
+            return []
+
+    return [devices[idx] for idx in sorted(selected_indexes)]
 while True:
     try:
         import curses
         import curses.textpad
         import time
         from arp_spoof import arp_spoof_attack, restore_arp
-        from network_scanner import scan_network
+        from network_scanner import scan_network, detect_default_gateway
         from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, clear_iptables
         break
     except:
@@ -27,6 +112,23 @@ logo_art = [
     "░▒▓███████▓▒░░▒▓█▓▒░░▒▓█▓▒░▒▓█▓▒░▒▓█▓▒░      ░▒▓█▓▒░                 ░▒▓█▓▒░░▒▓█▓▒░░▒▓██████▓▒░  ",
 ]
 
+
+def safe_addstr(stdscr, y, x, text, attr=0):
+    """Safely draw text in curses without overflowing terminal bounds."""
+    height, width = stdscr.getmaxyx()
+    if y < 0 or y >= height or x < 0 or x >= width:
+        return
+
+    available = width - x - 1
+    if available <= 0:
+        return
+
+    clipped = text[:available]
+    try:
+        stdscr.addstr(y, x, clipped, attr)
+    except curses.error:
+        pass
+
 def draw_bordered_window(stdscr, y, x, height, width):
     """ Рисуем окно с рамкой в заданной позиции с определенными размерами. """
     stdscr.attron(curses.color_pair(6))  # Устанавливаем цвет для рамки
@@ -39,22 +141,22 @@ def draw_logo_and_menu(stdscr, current_row, menu):
 
     # Рисуем логотип
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
-        stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
+        safe_addstr(stdscr, i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
 
     # Рисуем меню
     draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
-    stdscr.addstr(len(logo_art) + 2, 2, "=== Sniff-NG Меню ===", curses.A_BOLD | curses.color_pair(2))  # Добавляем заголовок меню
-    stdscr.addstr(len(logo_art) + 4, 4, "❤️WER1XY❤️", curses.A_BOLD | curses.color_pair(1))  # Добавляем инструкции
-    stdscr.addstr(len(logo_art) + 6, 2, "Используйте стрелки для навигации и Enter для выбора.\n", curses.A_BOLD | curses.color_pair(3))  # Добавляем инструкции
+    safe_addstr(stdscr, len(logo_art) + 2, 2, "=== Sniff-NG Меню ===", curses.A_BOLD | curses.color_pair(2))  # Добавляем заголовок меню
+    safe_addstr(stdscr, len(logo_art) + 4, 4, "WER1XY", curses.A_BOLD | curses.color_pair(1))  # ASCII-safe подпись
+    safe_addstr(stdscr, len(logo_art) + 6, 2, "Используйте стрелки для навигации и Enter для выбора.", curses.A_BOLD | curses.color_pair(3))  # Добавляем инструкции
 
     for idx, row in enumerate(menu):  # Проходим по элементам меню
         y_position = len(logo_art) + 8 + idx  # Рассчитываем вертикальную позицию для каждого элемента
         if idx == current_row:  # Подсвечиваем текущий элемент меню
             stdscr.attron(curses.color_pair(4))  # Устанавливаем цвет подсветки
-            stdscr.addstr(y_position, 2, f"> {row}")  # Добавляем подсвеченный элемент меню
+            safe_addstr(stdscr, y_position, 2, f"> {row}")  # Добавляем подсвеченный элемент меню
             stdscr.attroff(curses.color_pair(4))  # Отключаем подсветку
         else:
-            stdscr.addstr(y_position, 4, row, curses.color_pair(5))  # Добавляем обычный элемент меню
+            safe_addstr(stdscr, y_position, 4, row, curses.color_pair(5))  # Добавляем обычный элемент меню
     stdscr.refresh()  # Обновляем экран
 
 
@@ -63,8 +165,8 @@ def draw_status_bar(stdscr, message):
     """ Рисуем строку состояния внизу экрана. """
     height, width = stdscr.getmaxyx()  # Получаем размеры экрана
     stdscr.attron(curses.color_pair(7))  # Устанавливаем цвет для строки состояния
-    stdscr.addstr(height - 1, 0, " " * (width - 1))  # Очищаем предыдущую строку состояния
-    stdscr.addstr(height - 1, 0, message)  # Отображаем новое сообщение
+    safe_addstr(stdscr, height - 1, 0, " " * (width - 1))  # Очищаем предыдущую строку состояния
+    safe_addstr(stdscr, height - 1, 0, message)  # Отображаем новое сообщение
     stdscr.attroff(curses.color_pair(7))  # Отключаем цвет
     stdscr.refresh()  # Обновляем экран
 
@@ -112,83 +214,187 @@ def scan_network_ui(stdscr):
     stdscr.clear()  # Очищаем экран
     # Рисуем логотип
     for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
-        stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
+        safe_addstr(stdscr, i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
     draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
     current_line = 14  # Начинаем с 2 строки
-    stdscr.addstr(current_line, 2, "=== Сканирование сети ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
+    safe_addstr(stdscr, current_line, 2, "=== Сканирование сети ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
     current_line += 2  # Переходим на следующую строку
-    stdscr.addstr(current_line, 4, "Сканирование сети, пожалуйста, подождите...", curses.color_pair(3))  # Сообщение о процессе сканирования
+    safe_addstr(stdscr, current_line, 4, "Сканирование сети, пожалуйста, подождите...", curses.color_pair(3))  # Сообщение о процессе сканирования
     stdscr.refresh()  # Обновляем экран
 
     devices = scan_network()  # Выполняем функцию сканирования сети
     current_line += 2  # Переходим на 2 строки вниз
 
     if not devices:  # Если не найдено устройств
-        stdscr.addstr(current_line, 4, "Устройства не найдены.", curses.color_pair(3))  # Сообщение об отсутствии устройств
-    else:  # Если устройства найдены
-        stdscr.addstr(current_line, 4, "Найденные устройства:", curses.color_pair(3))  # Сообщение о найденных устройствах
-        current_line += 2  # Переходим на 2 строки вниз
-        for device in devices:  # Проходим по каждому найденному устройству
-            stdscr.addstr(current_line, 4, f"- {device}", curses.color_pair(5))  # Отображаем каждое устройство
-            current_line += 1  # Переходим на следующую строку для следующего устройства
-    stdscr.addstr(current_line + 2, 2, "Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение для возврата в меню
-    stdscr.refresh()  # Обновляем экран
-    draw_status_bar(stdscr,
-                    "Статус: Сканирование | Нажмите Enter для выхода.")  # Показываем строку состояния
-    stdscr.getch()  # Ожидаем нажатия клавиши для возврата
+        safe_addstr(stdscr, current_line, 4, "Устройства не найдены.", curses.color_pair(3))
+        safe_addstr(stdscr, current_line + 2, 2, "Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))
+        stdscr.refresh()
+        draw_status_bar(stdscr, "Статус: Сканирование | Устройства не найдены")
+        stdscr.getch()
+        return
+
+    selection_cursor = 0
+    selected_indexes = set()
+
+    while True:
+        stdscr.clear()
+        for i, line in enumerate(logo_art):
+            safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+
+        safe_addstr(stdscr, 12, 2, "=== Выбор устройств (аудит) ===", curses.A_BOLD | curses.color_pair(2))
+        safe_addstr(stdscr, 13, 2, "Space: выбрать, Enter: подтвердить, Q: назад", curses.color_pair(3))
+
+        max_rows = max(5, stdscr.getmaxyx()[0] - 18)
+        window_start = max(0, selection_cursor - max_rows + 1)
+        window_end = min(len(devices), window_start + max_rows)
+
+        row_y = 15
+        for idx in range(window_start, window_end):
+            device = devices[idx]
+            ip = device.get("ip", "?") if isinstance(device, dict) else str(device)
+            mac = device.get("mac", "?") if isinstance(device, dict) else "?"
+            mark = "[x]" if idx in selected_indexes else "[ ]"
+            row_text = f"{mark} {ip}  {mac}"
+
+            if idx == selection_cursor:
+                stdscr.attron(curses.color_pair(4))
+                safe_addstr(stdscr, row_y, 2, row_text)
+                stdscr.attroff(curses.color_pair(4))
+            else:
+                safe_addstr(stdscr, row_y, 2, row_text, curses.color_pair(5))
+            row_y += 1
+
+        draw_status_bar(stdscr, f"Выбрано устройств: {len(selected_indexes)}")
+        stdscr.refresh()
+
+        key = stdscr.getch()
+        if key == curses.KEY_UP and selection_cursor > 0:
+            selection_cursor -= 1
+        elif key == curses.KEY_DOWN and selection_cursor < len(devices) - 1:
+            selection_cursor += 1
+        elif key == ord(' '):
+            if selection_cursor in selected_indexes:
+                selected_indexes.remove(selection_cursor)
+            else:
+                selected_indexes.add(selection_cursor)
+        elif key in [10, 13]:
+            break
+        elif key in [ord('q'), ord('Q')]:
+            return
+
+    stdscr.clear()
+    safe_addstr(stdscr, 2, 2, "=== Итог выбора устройств ===", curses.A_BOLD | curses.color_pair(2))
+    if not selected_indexes:
+        safe_addstr(stdscr, 4, 2, "Ничего не выбрано.", curses.color_pair(3))
+    else:
+        y = 4
+        for idx in sorted(selected_indexes):
+            device = devices[idx]
+            ip = device.get("ip", "?") if isinstance(device, dict) else str(device)
+            mac = device.get("mac", "?") if isinstance(device, dict) else "?"
+            safe_addstr(stdscr, y, 2, f"- {ip} ({mac})", curses.color_pair(3))
+            y += 1
+
+    safe_addstr(stdscr, stdscr.getmaxyx()[0] - 2, 2, "Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))
+    stdscr.refresh()
+    stdscr.getch()
+
+def get_local_ip_for_target(target_ip):
+    """Возвращает локальный IP, находящийся в одной сети с target_ip."""
+    try:
+        target_net = ipaddress.ip_network(target_ip + '/24', strict=False)
+        for iface in netifaces.interfaces():
+            addrs = netifaces.ifaddresses(iface)
+            if netifaces.AF_INET in addrs:
+                for addr in addrs[netifaces.AF_INET]:
+                    ip = addr.get('addr')
+                    if ip and ipaddress.ip_address(ip) in target_net:
+                        return ip
+    except Exception:
+        pass
+    return None
 
 def arp_spoofing_ui(stdscr):
-    stdscr.clear()  # Очищаем экран
-    # Рисуем логотип
-    for i, line in enumerate(logo_art):  # Проходим по каждой строке логотипа
-        stdscr.addstr(i, 0, line, curses.color_pair(1))  # Добавляем каждую строку с цветом "cyan"
-    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)  # Рисуем окно с рамкой под логотипом
-    stdscr.addstr(12, 2, "=== Запуск ARP Spoofing ===", curses.A_BOLD | curses.color_pair(2))  # Заголовок
+    stdscr.clear()
+    for i, line in enumerate(logo_art):
+        safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)
+    safe_addstr(stdscr, 12, 2, "=== Выбор целей для аудита ===", curses.A_BOLD | curses.color_pair(2))
+    safe_addstr(stdscr, 13, 2, "Space: выбрать, Enter: подтвердить, Q: назад", curses.color_pair(3))
+    stdscr.refresh()
 
-    # Ввод Target IP
-    stdscr.addstr(16, 2, "Введите Target IP: ", curses.color_pair(2))  # Вопрос для ввода Target IP
-    target_window = stdscr.subwin(1, 24, 16, 24)  # Создаем окно для ввода IP
-    curses.textpad.rectangle(stdscr, 15, 22, 17, 48)  # Рисуем рамку для поля ввода
-    target_box = curses.textpad.Textbox(target_window)  # Поле для ввода Target IP
-    draw_status_bar(stdscr,
-                    "Статус: ARP-Spoofing | Введите Target | Нажмите Enter для подтверждения.")
-    # Ввод Gateway IP
-    stdscr.addstr(20, 2, "Введите Gateway IP: ", curses.color_pair(2))  # Вопрос для ввода Gateway IP
-    gateway_window = stdscr.subwin(1, 24, 20, 24)  # Создаем окно для ввода IP
-    curses.textpad.rectangle(stdscr, 19, 22, 21, 48)  # Рисуем рамку для поля ввода
-    gateway_box = curses.textpad.Textbox(gateway_window)  # Поле для ввода Gateway IP
-    draw_status_bar(stdscr,
-                    "Статус: ARP-Spoofing | Введите Gateway | Нажмите Enter для подтверждения.")
-    stdscr.addstr(26, 2, "Нажмите CTRL+X для завершения ввода.", curses.color_pair(2))  # Сообщение о завершении ввода
-    stdscr.refresh()  # Обновляем экран
+    devices = scan_network()
+    selected_devices = select_devices_ui(stdscr, devices)
 
-    def custom_edit_textbox(textbox):
-        """Функция для расширенного редактирования текста с заменой символа при удалении на пробел."""
-        while True:
-            char = textbox.win.getch()  # Чтение символа с клавиатуры
-            if char == curses.KEY_BACKSPACE or char == 127:  # Обработка клавиши Backspace
-                y, x = textbox.win.getyx()  # Получаем текущие координаты курсора
-                if x > 0:  # Если не в начале строки
-                    textbox.win.delch(y, x - 1)  # Удаляем символ слева от курсора
-                    textbox.win.insch(y, x - 1, ' ')  # Вставляем пробел вместо удаленного символа
-                    textbox.win.move(y, x - 1)  # Перемещаем курсор на позицию назад
-            elif char == 10:  # Если нажата клавиша Enter, завершаем ввод
-                break
+    # Получаем список IP выбранных целей
+    target_ips = [d.get("ip") if isinstance(d, dict) else str(d) for d in selected_devices if d]
+
+
+    stdscr.clear()
+    safe_addstr(stdscr, 2, 2, "=== Итог выбора целей ===", curses.A_BOLD | curses.color_pair(2))
+    if not target_ips:
+        safe_addstr(stdscr, 4, 2, "Ничего не выбрано.", curses.color_pair(3))
+    else:
+        # Группируем IP по подсетям
+        from collections import defaultdict
+        nets = defaultdict(list)
+        for ip in target_ips:
+            try:
+                net = str(ipaddress.ip_network(ip + '/24', strict=False))
+            except Exception:
+                net = 'unknown'
+            nets[net].append(ip)
+
+        y = 4
+        for net, ips in nets.items():
+            safe_addstr(stdscr, y, 2, f"Подсеть: {net}", curses.A_BOLD | curses.color_pair(2))
+            local_ip = get_local_ip_for_target(ips[0])
+            gateway_ip = get_gateway_for_target(ips[0])
+            if local_ip:
+                safe_addstr(stdscr, y + 1, 4, f"IP вашей сети: {local_ip}", curses.color_pair(2))
             else:
-                textbox.do_command(char)  # Все остальные символы передаем в стандартную обработку
-        return textbox.gather()  # Возвращаем введенный текст
+                safe_addstr(stdscr, y + 1, 4, f"IP вашей сети: не найден", curses.color_pair(3))
+            if gateway_ip:
+                safe_addstr(stdscr, y + 2, 4, f"Gateway: {gateway_ip}", curses.color_pair(2))
+            else:
+                safe_addstr(stdscr, y + 2, 4, f"Gateway: не найден", curses.color_pair(3))
+            y += 3
+            safe_addstr(stdscr, y, 4, "Цели:", curses.A_BOLD | curses.color_pair(2))
+            y += 1
+            for ip in ips:
+                safe_addstr(stdscr, y, 6, f"- {ip}", curses.color_pair(3))
+                y += 1
 
-    # Получаем и обрабатываем введенные значения
-    target_ip = custom_edit_textbox(target_box).strip()  # Получаем введенный Target IP
-    gateway_ip = custom_edit_textbox(gateway_box).strip()  # Получаем введенный Gateway IP
+    safe_addstr(stdscr, stdscr.getmaxyx()[0] - 4, 2, "Нажмите Enter для передачи в spoof-логику, Q — отмена", curses.color_pair(3))
+    stdscr.refresh()
 
-    # Запускаем ARP Spoofing с введенными данными
-    arp_spoof_attack(target_ip, gateway_ip)  # Выполняем функцию ARP Spoofing
+    while True:
+        key = stdscr.getch()
+        if key in [10, 13]:
+            break
+        elif key in [ord('q'), ord('Q')]:
+            return
 
-    stdscr.addstr(22, 2, "ARP Spoofing запущен. Нажмите любую клавишу, чтобы вернуться в меню...",
-                  curses.color_pair(3))  # Сообщение о завершении
-    stdscr.refresh()  # Обновляем экран
-    stdscr.getch()  # Ожидаем нажатия клавиши для возврата
+    # Для каждой подсети вызываем spoof-логику с ips и gateway
+    from arp_spoof import arp_spoof_attack
+    from collections import defaultdict
+    nets = defaultdict(list)
+    for ip in target_ips:
+        try:
+            net = str(ipaddress.ip_network(ip + '/24', strict=False))
+        except Exception:
+            net = 'unknown'
+        nets[net].append(ip)
+
+    for net, ips in nets.items():
+        gateway_ip = get_gateway_for_target(ips[0])
+        if gateway_ip:
+            try:
+                arp_spoof_attack(ips, gateway_ip)
+            except Exception as e:
+                safe_addstr(stdscr, stdscr.getmaxyx()[0] - 2, 2, f"Ошибка: {e}", curses.color_pair(3))
+                stdscr.refresh()
+                stdscr.getch()
 def restore_arp_ui(stdscr):
     stdscr.clear()  # Очищаем экран
     # Рисуем логотип

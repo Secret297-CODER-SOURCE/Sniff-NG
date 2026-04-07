@@ -4,13 +4,13 @@
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python](https://img.shields.io/badge/Python-3.8%2B-blue)](https://www.python.org/)
-![Platform: Linux](https://img.shields.io/badge/platform-Linux-yellow)
+![Platform: Linux+macOS](https://img.shields.io/badge/platform-Linux%20%2B%20macOS-yellow)
 ![Status: Active](https://img.shields.io/badge/status-active-brightgreen)
 ![img.png](img.png)
 ---
 
 **Tags:**  
-`network` `arp-spoofing` `mitm` `sniffer` `ethical-hacking` `pentest` `python` `security` `tui` `linux` `local-network` `network-scanner` `infosec` `hacking-tool`
+`network` `arp-spoofing` `mitm` `sniffer` `ethical-hacking` `pentest` `python` `security` `tui` `linux` `macos` `local-network` `network-scanner` `infosec` `hacking-tool`
 
 ---
 
@@ -18,7 +18,7 @@
 
 **Sniff-NG** is a Python tool for network security testing.  
 It provides fast local network device scanning, ARP spoofing (MITM), and a fully interactive TUI menu.  
-Supports multiple Linux distributions and automatic dependency installation.
+Supports Linux and macOS with automatic dependency installation paths.
 
 ---
 
@@ -26,18 +26,19 @@ Supports multiple Linux distributions and automatic dependency installation.
 
 - **TUI interface:** no command line needed
 - **Network scanner:** find all devices in the local network
+- **Auto gateway detection:** detects default router IP for faster setup
 - **ARP spoofing / MITM:** easy attack launch via menu
 - **Restore ARP tables:** clean up after attacks
-- **One-click dependency install:** works on Ubuntu, Debian, Arch, Fedora, CentOS, etc.
+- **One-click dependency install:** Linux package managers + Homebrew on macOS
 - **Python 3.8+** compatible
 
 ---
 
 ## Requirements
 
-- Linux OS (Debian, Ubuntu, Arch, Fedora, CentOS, etc.)
+- Linux (Debian, Ubuntu, Arch, Fedora, CentOS, etc.) or macOS
 - Python 3.8+
-- Tools: `arp-scan`, `dsniff`
+- Tools: `arp-scan` (`dsniff` is Linux-focused)
 - Python libraries: `scapy`, `mitmproxy`
 
 ---
@@ -53,6 +54,13 @@ sudo python3 console_ui.py
 > Most features require root privileges for network access.
 
 If dependencies are missing, select "Install dependencies" in the TUI menu.
+
+### macOS notes
+
+- Install Homebrew first: https://brew.sh
+- Run Sniff-NG with elevated privileges (`sudo`) for raw packet operations.
+- On macOS, scanner can use `arp-scan` (if installed) or Scapy ARP fallback.
+- Linux `iptables` redirect helpers are not used on macOS (`pf` must be configured manually if you need redirect/NAT rules).
 
 ---
 
