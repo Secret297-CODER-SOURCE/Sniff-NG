@@ -91,6 +91,7 @@ while True:
         from arp_spoof import arp_spoof_attack, restore_arp
         from network_scanner import scan_network, detect_default_gateway
         from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, clear_iptables
+        import proxy_server
         break
     except:
         from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, \
@@ -186,7 +187,7 @@ def main_menu(stdscr):
     curses.init_pair(7, curses.COLOR_BLACK, curses.COLOR_WHITE)   # Цвет строки состояния
 
     current_row = 0  # Изначально выделена первая строка
-    menu = ["Сканировать сеть", "Запустить ARP Spoofing", "Восстановить таблицы ARP", "Установить зависимости", "Выход"]  # Пункты меню
+    menu = ["Сканировать сеть", "Запустить ARP Spoofing", "Восстановить таблицы ARP", "Запустить прокси-сервер", "Установить зависимости", "Выход"]  # Пункты меню
 
     while True:
         draw_logo_and_menu(stdscr, current_row, menu)  # Рисуем логотип и меню
@@ -205,9 +206,11 @@ def main_menu(stdscr):
                 arp_spoofing_ui(stdscr)
             elif current_row == 2:  # Если выбран пункт "Восстановить таблицы ARP"
                 restore_arp_ui(stdscr)
-            elif current_row == 3:  # Если выбран пункт "Установить зависимости"
+            elif current_row == 3:  # Если выбран пункт "Запустить прокси-сервер"
+                proxy_server_ui(stdscr)
+            elif current_row == 4:  # Если выбран пункт "Установить зависимости"
                 install_dependencies_ui(stdscr)
-            elif current_row == 4:  # Если выбран пункт "Выход"
+            elif current_row == 5:  # Если выбран пункт "Выход"
                 break  # Выходим из цикла и завершаем программу
 
 def scan_network_ui(stdscr):
@@ -408,6 +411,57 @@ def restore_arp_ui(stdscr):
     stdscr.addstr(6, 2, "Таблицы ARP восстановлены. Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение о завершении
     stdscr.refresh()  # Обновляем экран
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата
+
+def proxy_server_ui(stdscr):
+    stdscr.clear()
+    for i, line in enumerate(logo_art):
+        safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)
+    header_y = len(logo_art) + 2
+    hint_y = header_y + 2
+    status_y = hint_y + 2
+    safe_addstr(stdscr, header_y, 2, "=== Прокси-сервер (mitmproxy) ===", curses.A_BOLD | curses.color_pair(2))
+
+    if proxy_server.is_running():
+        safe_addstr(stdscr, hint_y, 4, "Прокси уже запущен. Нажмите S для остановки, Q — назад.", curses.color_pair(3))
+    else:
+        safe_addstr(stdscr, hint_y, 4, "Нажмите Enter для запуска прокси (порт 8080), Q — назад.", curses.color_pair(3))
+
+    draw_status_bar(stdscr, "Статус: Прокси-сервер")
+    stdscr.refresh()
+
+    while True:
+        key = stdscr.getch()
+        if key in [10, 13] and not proxy_server.is_running():
+            error_msg = None
+            try:
+                enable_ip_forwarding()
+            except Exception as e:
+                error_msg = f"Ошибка включения IP-форвардинга: {e}"
+            if error_msg is None:
+                try:
+                    setup_iptables()
+                except Exception as e:
+                    error_msg = f"Ошибка настройки iptables: {e}"
+            if error_msg is None:
+                try:
+                    proxy_server.start_proxy(port=8080)
+                    safe_addstr(stdscr, status_y, 4, "Прокси запущен на порту 8080. Нажмите S для остановки.", curses.color_pair(4))
+                except Exception as e:
+                    error_msg = f"Ошибка запуска прокси: {e}"
+            if error_msg:
+                safe_addstr(stdscr, status_y, 4, error_msg, curses.color_pair(3))
+            stdscr.refresh()
+        elif key in [ord('s'), ord('S')] and proxy_server.is_running():
+            try:
+                proxy_server.stop_proxy()
+            finally:
+                clear_iptables()
+                disable_ip_forwarding()
+            safe_addstr(stdscr, status_y, 4, "Прокси остановлен.                                    ", curses.color_pair(3))
+            stdscr.refresh()
+        elif key in [ord('q'), ord('Q')]:
+            return
 
 def install_dependencies_ui(stdscr):
     stdscr.clear()  # Очищаем экран
