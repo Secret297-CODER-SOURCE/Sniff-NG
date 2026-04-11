@@ -12,6 +12,7 @@ proxy_server.py — запуск/остановка mitmproxy в прозрач�
 import subprocess
 
 _mitmproxy_process = None
+_log_fd = None
 DEFAULT_PORT = 8080
 DEFAULT_LOG = "/tmp/sniff-ng-traffic.log"
 
@@ -22,13 +23,20 @@ def start_mitmproxy(port=DEFAULT_PORT, log_file=DEFAULT_LOG):
 
     Возвращает True при успехе, False если mitmdump не найден или уже запущен.
     """
-    global _mitmproxy_process
+    global _mitmproxy_process, _log_fd
 
     if _mitmproxy_process is not None and _mitmproxy_process.poll() is None:
         return True  # уже работает
 
     try:
-        log_fd = open(log_file, "w") if log_file else subprocess.DEVNULL
+        if log_file:
+            _log_fd = open(log_file, "w")
+            stdout = _log_fd
+            stderr = _log_fd
+        else:
+            stdout = subprocess.DEVNULL
+            stderr = subprocess.DEVNULL
+
         _mitmproxy_process = subprocess.Popen(
             [
                 "mitmdump",
@@ -36,13 +44,15 @@ def start_mitmproxy(port=DEFAULT_PORT, log_file=DEFAULT_LOG):
                 "--showhost",
                 "-p", str(port),
             ],
-            stdout=log_fd,
-            stderr=log_fd,
+            stdout=stdout,
+            stderr=stderr,
         )
         return True
     except FileNotFoundError:
+        _close_log_fd()
         return False
     except Exception:
+        _close_log_fd()
         return False
 
 
@@ -66,7 +76,18 @@ def stop_mitmproxy():
             _mitmproxy_process.wait()
 
     _mitmproxy_process = None
+    _close_log_fd()
     return True
+
+
+def _close_log_fd():
+    global _log_fd
+    if _log_fd is not None:
+        try:
+            _log_fd.close()
+        except Exception:
+            pass
+        _log_fd = None
 
 
 def is_running():

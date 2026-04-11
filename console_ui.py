@@ -98,6 +98,16 @@ while True:
             setup_iptables, clear_iptables
 
         install_dependencies()
+# Вспомогательная функция — извлекает IP из записи устройства
+def _device_ip(device):
+    """Возвращает IP-строку из dict или str; None если данных нет."""
+    if not device:
+        return None
+    if isinstance(device, dict):
+        return device.get("ip") or None
+    val = str(device).strip()
+    return val if val else None
+
 # ASCII-логотип "Sniff-NG"
 logo_art = [
     "",
@@ -438,8 +448,9 @@ def mitm_proxy_ui(stdscr):
       5. Остановить всё и восстановить сеть.
     """
 
-    _targets = []   # список IP выбранных целей
+    _targets = []       # список IP выбранных целей
     _gateway = None
+    restore_errors = []  # ошибки при восстановлении ARP
 
     def _draw_status():
         stdscr.clear()
@@ -495,7 +506,7 @@ def mitm_proxy_ui(stdscr):
         if not selected:
             return
 
-        _targets = [d.get("ip") if isinstance(d, dict) else str(d) for d in selected if d]
+        _targets = [_device_ip(d) for d in selected if _device_ip(d)]
         _gateway = get_gateway_for_target(_targets[0]) if _targets else None
 
         if not _gateway:
@@ -530,6 +541,7 @@ def mitm_proxy_ui(stdscr):
             stdscr.getch()
 
     def _stop_mitm():
+        nonlocal restore_errors
         # Останавливаем mitmproxy
         proxy_server.stop_mitmproxy()
 
@@ -537,12 +549,13 @@ def mitm_proxy_ui(stdscr):
         stop_arp_spoof_thread()
 
         # Восстанавливаем ARP-таблицы
+        restore_errors = []
         if _targets and _gateway:
             for t in _targets:
                 try:
                     restore_arp(t, _gateway)
-                except Exception:
-                    pass
+                except Exception as e:
+                    restore_errors.append(f"{t}: {e}")
 
         # Убираем iptables-правила
         clear_iptables()
@@ -561,6 +574,15 @@ def mitm_proxy_ui(stdscr):
         elif key in [ord('x'), ord('X')]:
             if is_arp_spoofing() or proxy_server.is_running():
                 _stop_mitm()
+                _draw_status()
+                if restore_errors:
+                    err_text = "; ".join(restore_errors[:3])
+                    safe_addstr(stdscr, 24, 2,
+                                f"Ошибки при восстановлении ARP: {err_text}. Нажмите любую клавишу.",
+                                curses.color_pair(3))
+                    stdscr.refresh()
+                    stdscr.getch()
+                restore_errors = []
 
 
 if __name__ == '__main__':
