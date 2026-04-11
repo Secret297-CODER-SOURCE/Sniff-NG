@@ -89,6 +89,12 @@ def install_dependencies():
         print("[*] Installing mitmproxy...")
         install_python_package("mitmproxy")
 
+    try:
+        import netifaces
+    except ImportError:
+        print("[*] Installing netifaces...")
+        install_python_package("netifaces")
+
     print("[*] All necessary packages installed.")
 
 def enable_ip_forwarding():

