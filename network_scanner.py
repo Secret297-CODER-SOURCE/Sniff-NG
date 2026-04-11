@@ -1,7 +1,25 @@
+# Получить список всех локальных IPv4 подсетей (ip/mask)
+def get_local_subnets():
+    import netifaces
+    subnets = set()
+    for iface in netifaces.interfaces():
+        addrs = netifaces.ifaddresses(iface)
+        if netifaces.AF_INET in addrs:
+            for addr in addrs[netifaces.AF_INET]:
+                ip = addr.get('addr')
+                netmask = addr.get('netmask')
+                if ip and netmask:
+                    try:
+                        network = ipaddress.IPv4Network(f"{ip}/{netmask}", strict=False)
+                        subnets.add(str(network))
+                    except Exception:
+                        pass
+    return list(subnets)
 import curses
 import subprocess
 import ipaddress
 import platform
+from network_scanner import get_local_subnets, find_additional_subnets
 
 
 # Функция для получения MAC-адреса
@@ -129,6 +147,28 @@ def _scan_with_scapy():
         return []
 
 
+def scan_all_networks():
+    """Сканирует все локальные IPv4 подсети и возвращает словарь: {subnet: [devices]}"""
+    results = {}
+    subnets = get_local_subnets()
+    for subnet in subnets:
+        try:
+            from scapy.all import ARP, Ether, srp
+            request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(subnet))
+            answered = srp(request, timeout=2, verbose=False)[0]
+            devices = []
+            seen = set()
+            for _, response in answered:
+                key = (response.psrc, response.hwsrc)
+                if key not in seen:
+                    seen.add(key)
+                    devices.append({'ip': response.psrc, 'mac': response.hwsrc})
+            results[subnet] = devices
+        except Exception:
+            results[subnet] = []
+    return results
+
+
 # Интерфейс с использованием curses
 def scan_network_ui(stdscr):
     stdscr.clear()
@@ -172,3 +212,72 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+def find_additional_subnets(devices, max_depth=1):
+    """
+    Для каждого устройства пытается определить дополнительные подсети через traceroute и ARP.
+    Возвращает set новых подсетей.
+    """
+    import ipaddress
+    import subprocess
+    found_subnets = set()
+    for dev in devices:
+        ip = dev.get('ip')
+        if not ip:
+            continue
+        # traceroute до устройства, чтобы узнать промежуточные маршрутизаторы
+        try:
+            output = subprocess.check_output(["traceroute", "-m", str(max_depth), ip], text=True, timeout=5)
+            for line in output.splitlines():
+                parts = line.split()
+                if len(parts) >= 2:
+                    hop_ip = parts[1]
+                    try:
+                        ip_obj = ipaddress.ip_address(hop_ip)
+                        # Попробуем получить маску через ARP
+                        # (или просто /24 для простоты)
+                        subnet = str(ipaddress.ip_network(f"{hop_ip}/24", strict=False))
+                        found_subnets.add(subnet)
+                    except Exception:
+                        continue
+        except Exception:
+            continue
+    return found_subnets
+
+def scan_networks_recursive(max_depth=2):
+    """
+    Рекурсивно сканирует все подсети, включая найденные через traceroute устройства.
+    Возвращает словарь: {subnet: [devices]} для всех найденных подсетей.
+    """
+    scanned = set()
+    results = {}
+    to_scan = set(get_local_subnets())
+    depth = 0
+    while to_scan and depth < max_depth:
+        new_to_scan = set()
+        for subnet in to_scan:
+            if subnet in scanned:
+                continue
+            try:
+                from scapy.all import ARP, Ether, srp
+                request = Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=str(subnet))
+                answered = srp(request, timeout=2, verbose=False)[0]
+                devices = []
+                seen = set()
+                for _, response in answered:
+                    key = (response.psrc, response.hwsrc)
+                    if key not in seen:
+                        seen.add(key)
+                        devices.append({'ip': response.psrc, 'mac': response.hwsrc})
+                results[subnet] = devices
+                # Найти дополнительные подсети через traceroute
+                found = find_additional_subnets(devices)
+                for s in found:
+                    if s not in scanned and s not in results:
+                        new_to_scan.add(s)
+            except Exception:
+                results[subnet] = []
+            scanned.add(subnet)
+        to_scan = new_to_scan
+        depth += 1
+    return results

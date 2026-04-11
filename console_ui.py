@@ -89,7 +89,7 @@ while True:
         import curses.textpad
         import time
         from arp_spoof import arp_spoof_attack, restore_arp, start_arp_spoof_thread, stop_arp_spoof_thread, is_arp_spoofing
-        from network_scanner import scan_network, detect_default_gateway
+        from network_scanner import scan_network, detect_default_gateway, scan_all_networks, scan_networks_recursive
         from dependency_manager import install_dependencies, enable_ip_forwarding, disable_ip_forwarding, setup_iptables, clear_iptables
         import proxy_server
         break
@@ -408,6 +408,7 @@ def arp_spoofing_ui(stdscr):
                 safe_addstr(stdscr, stdscr.getmaxyx()[0] - 2, 2, f"Ошибка: {e}", curses.color_pair(3))
                 stdscr.refresh()
                 stdscr.getch()
+
 def restore_arp_ui(stdscr):
     stdscr.clear()  # Очищаем экран
     # Рисуем логотип
@@ -584,6 +585,142 @@ def mitm_proxy_ui(stdscr):
                     stdscr.getch()
                 restore_errors = []
 
+
+def select_targets_from_all_networks_ui(stdscr):
+    stdscr.clear()
+    for i, line in enumerate(logo_art):
+        safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)
+    safe_addstr(stdscr, 12, 2, "=== Выбор целей из всех подсетей ===", curses.A_BOLD | curses.color_pair(2))
+    safe_addstr(stdscr, 13, 2, "Space: выбрать, Enter: подтвердить, Q: назад", curses.color_pair(3))
+    stdscr.refresh()
+
+    all_devices = scan_all_networks()  # {subnet: [devices]}
+    device_list = []
+    subnet_map = {}
+    for subnet, devices in all_devices.items():
+        for dev in devices:
+            device_list.append(dev)
+            subnet_map[dev['ip']] = subnet
+
+    selected_devices = select_devices_ui(stdscr, device_list)
+    target_ips = [d.get("ip") for d in selected_devices if d]
+
+    stdscr.clear()
+    safe_addstr(stdscr, 2, 2, "=== Итог выбора целей ===", curses.A_BOLD | curses.color_pair(2))
+    if not target_ips:
+        safe_addstr(stdscr, 4, 2, "Ничего не выбрано.", curses.color_pair(3))
+    else:
+        from collections import defaultdict
+        nets = defaultdict(list)
+        for ip in target_ips:
+            net = subnet_map.get(ip, 'unknown')
+            nets[net].append(ip)
+        y = 4
+        for net, ips in nets.items():
+            safe_addstr(stdscr, y, 2, f"Подсеть: {net}", curses.A_BOLD | curses.color_pair(2))
+            local_ip = get_local_ip_for_target(ips[0])
+            gateway_ip = get_gateway_for_target(ips[0])
+            if local_ip:
+                safe_addstr(stdscr, y + 1, 4, f"IP вашей сети: {local_ip}", curses.color_pair(2))
+            else:
+                safe_addstr(stdscr, y + 1, 4, f"IP вашей сети: не найден", curses.color_pair(3))
+            if gateway_ip:
+                safe_addstr(stdscr, y + 2, 4, f"Gateway: {gateway_ip}", curses.color_pair(2))
+            else:
+                safe_addstr(stdscr, y + 2, 4, f"Gateway: не найден", curses.color_pair(3))
+            y += 3
+            safe_addstr(stdscr, y, 4, "Цели:", curses.A_BOLD | curses.color_pair(2))
+            y += 1
+            for ip in ips:
+                safe_addstr(stdscr, y, 6, f"- {ip}", curses.color_pair(3))
+                y += 1
+    safe_addstr(stdscr, stdscr.getmaxyx()[0] - 4, 2, "Нажмите Enter для передачи в spoof-логику, Q — отмена", curses.color_pair(3))
+    stdscr.refresh()
+    while True:
+        key = stdscr.getch()
+        if key in [10, 13]:
+            break
+        elif key in [ord('q'), ord('Q')]:
+            return
+    from arp_spoof import arp_spoof_attack
+    for net, ips in nets.items():
+        gateway_ip = get_gateway_for_target(ips[0])
+        if gateway_ip:
+            try:
+                arp_spoof_attack(ips, gateway_ip)
+            except Exception as e:
+                safe_addstr(stdscr, stdscr.getmaxyx()[0] - 2, 2, f"Ошибка: {e}", curses.color_pair(3))
+                stdscr.refresh()
+                stdscr.getch()
+
+def select_targets_from_all_networks_recursive_ui(stdscr):
+    stdscr.clear()
+    for i, line in enumerate(logo_art):
+        safe_addstr(stdscr, i, 0, line, curses.color_pair(1))
+    draw_bordered_window(stdscr, len(logo_art) + 1, 0, 10, 50)
+    safe_addstr(stdscr, 12, 2, "=== Выбор целей из всех подсетей (рекурсивно) ===", curses.A_BOLD | curses.color_pair(2))
+    safe_addstr(stdscr, 13, 2, "Space: выбрать, Enter: подтвердить, Q: назад", curses.color_pair(3))
+    stdscr.refresh()
+
+    all_devices = scan_networks_recursive(max_depth=2)  # {subnet: [devices]}
+    device_list = []
+    subnet_map = {}
+    for subnet, devices in all_devices.items():
+        for dev in devices:
+            device_list.append(dev)
+            subnet_map[dev['ip']] = subnet
+
+    selected_devices = select_devices_ui(stdscr, device_list)
+    target_ips = [d.get("ip") for d in selected_devices if d]
+
+    stdscr.clear()
+    safe_addstr(stdscr, 2, 2, "=== Итог выбора целей ===", curses.A_BOLD | curses.color_pair(2))
+    if not target_ips:
+        safe_addstr(stdscr, 4, 2, "Ничего не выбрано.", curses.color_pair(3))
+    else:
+        from collections import defaultdict
+        nets = defaultdict(list)
+        for ip in target_ips:
+            net = subnet_map.get(ip, 'unknown')
+            nets[net].append(ip)
+        y = 4
+        for net, ips in nets.items():
+            safe_addstr(stdscr, y, 2, f"Подсеть: {net}", curses.A_BOLD | curses.color_pair(2))
+            local_ip = get_local_ip_for_target(ips[0])
+            gateway_ip = get_gateway_for_target(ips[0])
+            if local_ip:
+                safe_addstr(stdscr, y + 1, 4, f"IP вашей сети: {local_ip}", curses.color_pair(2))
+            else:
+                safe_addstr(stdscr, y + 1, 4, f"IP вашей сети: не найден", curses.color_pair(3))
+            if gateway_ip:
+                safe_addstr(stdscr, y + 2, 4, f"Gateway: {gateway_ip}", curses.color_pair(2))
+            else:
+                safe_addstr(stdscr, y + 2, 4, f"Gateway: не найден", curses.color_pair(3))
+            y += 3
+            safe_addstr(stdscr, y, 4, "Цели:", curses.A_BOLD | curses.color_pair(2))
+            y += 1
+            for ip in ips:
+                safe_addstr(stdscr, y, 6, f"- {ip}", curses.color_pair(3))
+                y += 1
+    safe_addstr(stdscr, stdscr.getmaxyx()[0] - 4, 2, "Нажмите Enter для передачи в spoof-логику, Q — отмена", curses.color_pair(3))
+    stdscr.refresh()
+    while True:
+        key = stdscr.getch()
+        if key in [10, 13]:
+            break
+        elif key in [ord('q'), ord('Q')]:
+            return
+    from arp_spoof import arp_spoof_attack
+    for net, ips in nets.items():
+        gateway_ip = get_gateway_for_target(ips[0])
+        if gateway_ip:
+            try:
+                arp_spoof_attack(ips, gateway_ip)
+            except Exception as e:
+                safe_addstr(stdscr, stdscr.getmaxyx()[0] - 2, 2, f"Ошибка: {e}", curses.color_pair(3))
+                stdscr.refresh()
+                stdscr.getch()
 
 if __name__ == '__main__':
     curses.wrapper(main_menu)  # Инициализируем программу с оберткой curses
